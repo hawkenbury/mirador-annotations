@@ -1,43 +1,32 @@
 /** */
 export default class AnnototAdapter {
   /** */
-  constructor(canvasId, endpointUrl,userId) {
+  constructor(canvasId, endpointUrl, userId) {
     this.canvasId = canvasId;
     this.endpointUrl = endpointUrl;
     this.userId=userId;
   }
 
-  /** getters : exercise the annotation API */
+  /** */
   get annotationPageId() {
-    return `${this.endpointUrl}/pages?uri=${this.canvasId}&&user=${this.userId}`;
+    return `${this.endpointUrl}/pages?uri=${this.canvasId}`;
   }
-
-  get createId() {
-    return `${this.endpointUrl}/create?user=${this.userId}`;
-  }
-
-  get deleteId() {
-    return `${this.endpointUrl}/delete`;
-  }
-
-  get updateId() {
-    return `${this.endpointUrl}/update`;
-  }
-
-
 
   /** */
   async create(annotation) {
-    console.log(JSON.stringify(annotation));
-    console.log("User is "+this.userId);
+    //annotation.creator.name=this.userId;
+    //annotation.creator.id=this.userId;
+    //console.log("userId :: "+this.userId);
+    //console.log(JSON.stringify(annotation));
+    //console.log("Annotation Creator :: "+JSON.stringify(annotation.creator));
     
-    return fetch(this.createId, {
+
+    return fetch(this.endpointUrl, {
       body: JSON.stringify({
         annotation: {
           canvas: this.canvasId,
           data: JSON.stringify(annotation),
           uuid: annotation.id,
-          creator: this.userId,
         },
       }),
       headers: {
@@ -52,45 +41,41 @@ export default class AnnototAdapter {
 
   /** */
   async update(annotation) {
-    return fetch(this.updateId, {
+    return fetch(`${this.endpointUrl}/${encodeURIComponent(annotation.id)}`, {
       body: JSON.stringify({
         annotation: {
-          canvas: this.canvasId,
           data: JSON.stringify(annotation),
           uuid: annotation.id,
-          creator: this.userId,
         },
       }),
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      method: 'POST',
+      method: 'PATCH',
     })
       .then((response) => this.all())
       .catch(() => this.all());
   }
 
-
+  /** */
   async delete(annoId) {
-      return fetch(this.deleteId, {
-          body: JSON.stringify({
-            uuid: annoId,
-            creator: this.userId,
-            canvas: this.canvasId,
-            },
-          ),
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          method: 'POST',
-        })
-          .then((response) => this.all())
-          .catch(() => this.all());
+    if( this.userId === annotation.body.creator){
+    return fetch(`${this.endpointUrl}/${encodeURIComponent(annoId)}`, {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      method: 'DELETE',
+    })
+      .then((response) => this.all())
+      .catch(() => this.all());
+    }
+    else{
+      alert('Cannot delete Annotation :: User '+this.userId+' is not the same as '+ annotation.body.creator);
+      this.get(annoId);
+    }
   }
-    
-  
 
   /** */
   async get(annoId) {
@@ -104,12 +89,6 @@ export default class AnnototAdapter {
 
   /** */
   async all() {
-    let page=(await fetch(this.annotationPageId)).json();
-    
-    page.then(function(result) {
-      console.log("ALL :: "+JSON.stringify(result));
-  });
-  
-    return page;
+    return (await fetch(this.annotationPageId)).json();
   }
 }

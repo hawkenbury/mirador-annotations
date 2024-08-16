@@ -1,9 +1,10 @@
 /** */
 export default class SimpleAnnotationServerV2Adapter {
   /** */
-  constructor(canvasId, endpointUrl) {
+  constructor(canvasId, endpointUrl, userId) {
     this.canvasId = canvasId;
     this.endpointUrl = endpointUrl;
+    this.userId=userId;
   }
 
   /** */
@@ -13,8 +14,13 @@ export default class SimpleAnnotationServerV2Adapter {
 
   /** */
   async create(annotation) {
+    annotation.creator.name=this.userId;
+    annotation.creator.id=this.userId;
+    console.log("Annotation :: "+JSON.stringify(annotation));
+
     return fetch(`${this.endpointUrl}/create`, {
-      body: JSON.stringify(SimpleAnnotationServerV2Adapter.createV2Anno(annotation)),
+      body: JSON.stringify(SimpleAnnotationServerV2Adapter.createV2Anno(annotation,this.userId)),
+      //body: JSON.stringify(annotation),
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -28,7 +34,8 @@ export default class SimpleAnnotationServerV2Adapter {
   /** */
   async update(annotation) {
     return fetch(`${this.endpointUrl}/update`, {
-      body: JSON.stringify(SimpleAnnotationServerV2Adapter.createV2Anno(annotation)),
+      body: JSON.stringify(SimpleAnnotationServerV2Adapter.createV2Anno(annotation,this.userId)),
+      //body: JSON.stringify(annotation),
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -40,7 +47,11 @@ export default class SimpleAnnotationServerV2Adapter {
   }
 
   /** */
-  async delete(annoId) {
+  /**async delete(annoId) {
+    let resource=`${this.endpointUrl}/destroy?uri=${encodeURIComponent(annoId)}`;
+    console.log("Anno ID :: "+annoId);
+    console.log("Deleting :: "+resource);
+
     return fetch(`${this.endpointUrl}/destroy?uri=${encodeURIComponent(annoId)}`, {
       headers: {
         Accept: 'application/json',
@@ -51,12 +62,39 @@ export default class SimpleAnnotationServerV2Adapter {
       .then((response) => this.all())
       .catch(() => this.all());
   }
+**/
+
+  async delete(annoId) {
+    const annotation=this.get(annoId);
+    
+    annotation.then( annotation => {
+      console.log(JSON.stringify(annotation));
+      //alert (this.userId+' :: '+ JSON.stringify(annotation.creator));
+
+      //if( this.userId === annotation.creator.name){
+        return fetch(`${this.endpointUrl}/destroy?uri=${encodeURIComponent(annoId)}`, {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          method: 'DELETE',
+        })
+          .then((response) => this.all())
+          .catch(() => this.all());
+    }
+    //else {
+      //alert('Cannot delete Annotation :: User '+this.userId+' is not the same as '+ annotation.creator.name);
+      //this.get(annoId);
+    //}
+  );
+}
 
   /** */
   async get(annoId) {
     // SAS does not have GET for a single annotation
     const annotationPage = await this.all();
     if (annotationPage) {
+      console.log(JSON.stringify(annotationPage));
       return annotationPage.items.find((item) => item.id === annoId);
     }
     return null;
@@ -64,31 +102,39 @@ export default class SimpleAnnotationServerV2Adapter {
 
   /** Returns an AnnotationPage with all annotations */
   async all() {
+    console.log("Getting All :: "+this.annotationPageId);
     const resp = await fetch(this.annotationPageId);
     const annos = await resp.json();
     return this.createAnnotationPage(annos);
   }
 
   /** Creates a V2 annotation from a V3 annotation */
-  static createV2Anno(v3anno) {
+  static createV2Anno(v3anno,userID) {
     const v2anno = {
       '@context': 'http://iiif.io/api/presentation/2/context.json',
       '@type': 'oa:Annotation',
       motivation: 'oa:commenting',
+      'dcterms:creator' : userID,
       on: {
         '@type': 'oa:SpecificResource',
         full: v3anno.target.source.id,
       },
+      otherContent:{
+        '@type' : 'dcterms:creator',
+        'label' : userID,
+      }
     };
+    
     // copy id if it is SAS-generated
     if (v3anno.id && v3anno.id.startsWith('http')) {
       v2anno['@id'] = v3anno.id;
     }
     if (Array.isArray(v3anno.body)) {
-      v2anno.resource = v3anno.body.map((b) => this.createV2AnnoBody(b));
+      v2anno.resource = v3anno.body.map((b) => this.createV2AnnoBody(b,userID));
     } else {
-      v2anno.resource = this.createV2AnnoBody(v3anno.body);
+      v2anno.resource = this.createV2AnnoBody(v3anno.body,userID);
     }
+    
     if (v3anno.target.selector) {
       if (Array.isArray(v3anno.target.selector)) {
         const selectors = v3anno.target.selector.map((s) => this.createV2AnnoSelector(s));
@@ -112,9 +158,9 @@ export default class SimpleAnnotationServerV2Adapter {
   }
 
   /** */
-  static createV2AnnoBody(v3body) {
+  static createV2AnnoBody(v3body,userID) {
     const v2body = {
-      chars: v3body.value,
+      chars: v3body.value+"<p>"+userID+"</p>",
     };
     if (v3body.purpose === 'tagging') {
       v2body['@type'] = 'oa:Tag';
@@ -127,6 +173,9 @@ export default class SimpleAnnotationServerV2Adapter {
     if (v3body.language) {
       v2body.language = v3body.language;
     }
+
+    v2body['dcterms:creator']=userID;
+    
     return v2body;
   }
 

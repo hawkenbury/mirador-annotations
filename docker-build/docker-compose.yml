@@ -1,0 +1,16 @@
+version: "3"
+networks:
+  default:
+    name: biblhertz
+    #external: true
+
+services:
+  node:
+    build:
+      context: ..
+      dockerfile: docker-build/Dockerfile
+    volumes:
+      - ../:/app
+    ports:
+      - 3001:3000
+    restart: unless-stopped

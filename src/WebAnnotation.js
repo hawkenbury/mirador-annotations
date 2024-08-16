@@ -17,12 +17,22 @@ export default class WebAnnotation {
   toJson() {
     return {
       body: this.createBody(),
+      //creator: this.returnCreator(),
       id: this.id,
       motivation: 'commenting',
       target: this.target(),
-      type: 'Annotation',
+      type: 'Annotation',   
     };
   }
+
+  returnCreator() {
+    return {
+      id: 'tbc',
+      name: "tbc",
+      type: 'Person',
+    };
+  }
+
 
   /** */
   createBody() {
